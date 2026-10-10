@@ -3,15 +3,16 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rag-evaluation-lab"
-version = "1.0.0"
-description = "A comprehensive RAG evaluation lab scoring decoupled retrieval (Precision@K, Recall@K, MRR, NDCG) and generation (Faithfulness, Context Precision, Citation Correctness) across pipeline configurations."
+name = "rag-reliability-observatory"
+version = "2.0.0"
+description = "Enterprise RAG Diagnostic Platform: Decoupled Retrieval, Ranking Degradation, Evidence Grounding & Failure Attribution"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
-    { name = "RAG Evaluation Specialist & AI Engineer", email = "rageval@example.com" }
+    { name = "Munir", email = "master72o@users.noreply.github.com" }
 ]
 dependencies = [
+    "pydantic>=2.0.0",
     "numpy>=1.22.0",
     "pandas>=1.5.0",
     "matplotlib>=3.5.0",
@@ -19,6 +20,7 @@ dependencies = [
     "scipy>=1.9.0",
     "scikit-learn>=1.0.0",
     "pyyaml>=6.0",
+    "streamlit>=1.30.0",
 ]
 
 [project.optional-dependencies]
@@ -28,7 +30,9 @@ dev = [
 ]
 
 [project.scripts]
+rag-observatory = "rag_observatory.cli:main"
 rag-eval = "rag_eval.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["rag_eval*"]
+where = ["src", "."]
+include = ["rag_observatory*", "rag_eval*"]
