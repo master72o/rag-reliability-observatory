@@ -3,8 +3,7 @@ Multi-layer Evaluation Engine computing decoupled Retrieval and Generation metri
 """
 
 import math
-from typing import List, Dict, Any, Set
-import numpy as np
+from typing import List, Set
 from rag_observatory.schema import (
     RetrievedPassage,
     GeneratedAnswer,
