@@ -15,6 +15,16 @@ from rag_observatory.schema import (
     RetrievalMetrics,
     GenerationMetrics,
 )
+from rag_observatory.evaluator import RAGEvaluator
+from rag_observatory.retriever import (
+    TextTokenizer,
+    BM25Retriever,
+    DenseVectorRetriever,
+    HybridRRFRetriever,
+    ContextualReranker,
+)
+from rag_observatory.generator import EvidenceGroundedGenerator
+from rag_observatory.failure_attributor import FailureAttributor
 
 __all__ = [
     "CorpusChunk",
@@ -25,4 +35,12 @@ __all__ = [
     "DiagnosticResult",
     "RetrievalMetrics",
     "GenerationMetrics",
+    "RAGEvaluator",
+    "TextTokenizer",
+    "BM25Retriever",
+    "DenseVectorRetriever",
+    "HybridRRFRetriever",
+    "ContextualReranker",
+    "EvidenceGroundedGenerator",
+    "FailureAttributor",
 ]
