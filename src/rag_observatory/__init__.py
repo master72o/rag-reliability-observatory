@@ -2,7 +2,7 @@
 RAG Reliability Observatory: Diagnostic Platform for Retrieval-Augmented Generation Systems.
 """
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 __author__ = "Munir (master72o)"
 
 from rag_observatory.schema import (
@@ -25,6 +25,7 @@ from rag_observatory.retriever import (
 )
 from rag_observatory.generator import EvidenceGroundedGenerator
 from rag_observatory.failure_attributor import FailureAttributor
+from rag_observatory.cost_tracker import RAGCostEstimator
 
 __all__ = [
     "CorpusChunk",
@@ -43,4 +44,5 @@ __all__ = [
     "ContextualReranker",
     "EvidenceGroundedGenerator",
     "FailureAttributor",
+    "RAGCostEstimator",
 ]
