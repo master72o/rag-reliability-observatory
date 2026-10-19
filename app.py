@@ -153,18 +153,24 @@ with tab1:
             "nDCG@K": v["mean_ndcg"],
             "Faithfulness": v["mean_faithfulness"],
             "Citation Precision": v["mean_citation_precision"],
+            "Mean Latency (ms)": v.get("mean_latency_ms", 0.0),
+            "Cost / 1k Queries ($)": round(v.get("mean_cost_per_query_usd", 0.0) * 1000, 4),
+            "Pareto Efficiency Index": v.get("efficiency_score", 0.0),
         }
         for k, v in ablation.items()
     ])
     st.dataframe(ab_df, use_container_width=True)
 
-    colA, colB = st.columns(2)
+    colA, colB, colC = st.columns(3)
     with colA:
-        st.markdown("#### Retrieval Quality Comparison (nDCG vs Recall)")
+        st.markdown("#### Retrieval Quality (nDCG vs Recall)")
         st.bar_chart(ab_df.set_index("Strategy")[["Recall@K", "nDCG@K"]])
     with colB:
         st.markdown("#### End-to-End Success Rate (%)")
         st.bar_chart(ab_df.set_index("Strategy")["Success Rate (%)"])
+    with colC:
+        st.markdown("#### Pareto Efficiency Index")
+        st.bar_chart(ab_df.set_index("Strategy")["Pareto Efficiency Index"])
 
 # TAB 2: FAILURE ATTRIBUTION EXPLORER
 with tab2:
@@ -237,6 +243,9 @@ with tab3:
         with col_q2:
             st.markdown(f"**Diagnostic Verdict:** `{res.failure_mode.value.upper()}`")
             st.markdown(f"**Root Cause Analysis:**\n> {res.diagnostic_explanation}")
+            lat_str = f"{res.latency_ms:.1f}ms" if res.latency_ms is not None else "N/A"
+            cost_str = f"${res.estimated_cost_usd:.6f}" if res.estimated_cost_usd is not None else "N/A"
+            st.caption(f"⏱️ **Inference Latency:** `{lat_str}` | 💰 **Estimated Cost:** `{cost_str}`")
             status_box = "badge-success" if not res.is_failure else "badge-error"
             st.markdown(f"<span class='{status_box}'>Status: {'PASSED' if not res.is_failure else 'FAILED'}</span>", unsafe_allow_html=True)
 

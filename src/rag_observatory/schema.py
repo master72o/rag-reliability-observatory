@@ -87,3 +87,5 @@ class DiagnosticResult(BaseModel):
     retrieved_chunk_ids: List[str]
     target_chunk_ids: List[str]
     cited_chunk_ids: List[str]
+    latency_ms: Optional[float] = None
+    estimated_cost_usd: Optional[float] = None

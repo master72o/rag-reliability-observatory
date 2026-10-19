@@ -29,3 +29,32 @@ def test_rank_retrieval_strategies():
     assert all("efficiency_score" in item for item in ranked)
     # Check descending order of efficiency score
     assert ranked[0]["efficiency_score"] >= ranked[1]["efficiency_score"] >= ranked[2]["efficiency_score"]
+
+
+def test_benchmark_runner_latency_and_efficiency():
+    from rag_observatory.benchmark_runner import BenchmarkRunner
+    from rag_observatory.schema import CorpusChunk, EvaluationQuery
+
+    chunks = [
+        CorpusChunk(chunk_id="c1", document_id="d1", document_title="OAuth Spec", text="Bearer tokens expire in 3600 seconds."),
+        CorpusChunk(chunk_id="c2", document_id="d2", document_title="Auth Spec", text="Refresh tokens have rolling expiry."),
+    ]
+    runner = BenchmarkRunner(chunks)
+    query = EvaluationQuery(
+        query_id="q1",
+        question="What is the bearer token TTL?",
+        reference_answer="Bearer tokens expire in 3600 seconds.",
+        ground_truth_chunk_ids=["c1"],
+        answerable=True,
+    )
+    diag = runner.run_query(query, strategy="bm25")
+    assert diag.latency_ms is not None
+    assert diag.latency_ms >= 0.0
+    assert diag.estimated_cost_usd is not None
+    assert diag.estimated_cost_usd > 0.0
+
+    study = runner.run_ablation_study([query])
+    assert "bm25" in study
+    assert "mean_latency_ms" in study["bm25"]
+    assert "efficiency_score" in study["bm25"]
+    assert study["bm25"]["efficiency_score"] > 0.0
