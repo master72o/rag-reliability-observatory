@@ -148,3 +148,83 @@ class FailureAttributor:
             target_chunk_ids=query.ground_truth_chunk_ids,
             cited_chunk_ids=answer.cited_chunk_ids,
         )
+
+    @classmethod
+    def aggregate_diagnostics(cls, diagnostics: List[DiagnosticResult]) -> Dict[str, Any]:
+        """
+        Aggregates query-level diagnostic outcomes across a dataset, calculating
+        failure distributions, query-type cross-tabulations, and deterministic mitigations.
+        """
+        if not diagnostics:
+            return {
+                "total_queries": 0,
+                "success_count": 0,
+                "failure_count": 0,
+                "grounded_success_rate": 0.0,
+                "failure_distribution": {},
+                "query_type_breakdown": {},
+                "top_failure_mode": None,
+                "recommended_mitigation": "No queries evaluated.",
+            }
+
+        total = len(diagnostics)
+        successes = sum(1 for d in diagnostics if not d.is_failure)
+        failures = total - successes
+
+        # Distribution by FailureMode
+        mode_counts: Dict[str, int] = {}
+        for d in diagnostics:
+            mode_key = d.failure_mode.value if hasattr(d.failure_mode, "value") else str(d.failure_mode)
+            mode_counts[mode_key] = mode_counts.get(mode_key, 0) + 1
+
+        mode_distribution = {
+            k: {"count": v, "percentage": round((v / total) * 100, 2)}
+            for k, v in sorted(mode_counts.items(), key=lambda x: x[1], reverse=True)
+        }
+
+        # Breakdown by query type
+        type_groups: Dict[str, Dict[str, int]] = {}
+        for d in diagnostics:
+            qtype = d.query_type.value if hasattr(d.query_type, "value") else str(d.query_type)
+            if qtype not in type_groups:
+                type_groups[qtype] = {"total": 0, "failures": 0}
+            type_groups[qtype]["total"] += 1
+            if d.is_failure:
+                type_groups[qtype]["failures"] += 1
+
+        query_type_breakdown = {}
+        for qtype, stats in type_groups.items():
+            query_type_breakdown[qtype] = {
+                "total": stats["total"],
+                "failures": stats["failures"],
+                "failure_rate": round(stats["failures"] / max(stats["total"], 1), 4),
+            }
+
+        # Identify dominant failure mode (excluding success_grounded)
+        failure_only_counts = {
+            k: v for k, v in mode_counts.items() if k != FailureMode.SUCCESS_GROUNDED.value
+        }
+        top_failure = max(failure_only_counts, key=failure_only_counts.get) if failure_only_counts else None
+
+        mitigations = {
+            FailureMode.RETRIEVAL_MISS.value: "Tune hybrid alpha towards dense embeddings or increase top-k retrieval depth.",
+            FailureMode.EVIDENCE_RANKED_LOW.value: "Incorporate a cross-encoder reranker (e.g., BGE-Reranker-Large) into the post-retrieval pipeline.",
+            FailureMode.CONTEXT_IGNORED.value: "Reinforce system prompt with chain-of-thought grounding and strict context-conditioned instructions.",
+            FailureMode.CITATION_MISMATCH.value: "Enforce JSON Schema or regex constrained decoding on chunk citation IDs.",
+            FailureMode.INCORRECT_ABSTENTION.value: "Lower conservative abstention threshold and provide high-relevance exemplar demonstrations.",
+            FailureMode.UNGROUNDED_HALLUCINATION.value: "Implement self-consistency verification and fine-tune classifier on out-of-domain unanswerable prompts.",
+        }
+
+        recommendation = mitigations.get(top_failure, "All evaluated queries met grounded reliability criteria.")
+
+        return {
+            "total_queries": total,
+            "success_count": successes,
+            "failure_count": failures,
+            "grounded_success_rate": round(successes / total, 4),
+            "failure_distribution": mode_distribution,
+            "query_type_breakdown": query_type_breakdown,
+            "top_failure_mode": top_failure,
+            "recommended_mitigation": recommendation,
+        }
+

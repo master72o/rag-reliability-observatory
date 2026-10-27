@@ -94,3 +94,66 @@ def test_grounded_success_detected():
     diag = FailureAttributor.diagnose(query, passages, answer, ret_m, gen_m)
     assert diag.failure_mode == FailureMode.SUCCESS_GROUNDED
     assert diag.is_failure is False
+
+
+def test_aggregate_diagnostics_empty():
+    agg = FailureAttributor.aggregate_diagnostics([])
+    assert agg["total_queries"] == 0
+    assert agg["success_count"] == 0
+    assert agg["grounded_success_rate"] == 0.0
+    assert agg["top_failure_mode"] is None
+
+
+def test_aggregate_diagnostics_mixed_with_mitigation():
+    from rag_observatory.schema import DiagnosticResult
+
+    ret_m = RetrievalMetrics(precision_at_k=1.0, recall_at_k=1.0, mrr=1.0, ndcg=1.0, retrieved_count=1, target_count=1)
+    gen_m = GenerationMetrics(faithfulness=1.0, answer_correctness=1.0, citation_precision=1.0, citation_recall=1.0, abstention_accuracy=1.0)
+
+    diag1 = DiagnosticResult(
+        query_id="q1",
+        query_type=QueryType.DIRECT_FACTUAL,
+        failure_mode=FailureMode.SUCCESS_GROUNDED,
+        is_failure=False,
+        diagnostic_explanation="Success",
+        retrieval=ret_m,
+        generation=gen_m,
+        retrieved_chunk_ids=["c1"],
+        target_chunk_ids=["c1"],
+        cited_chunk_ids=["c1"],
+    )
+    diag2 = DiagnosticResult(
+        query_id="q2",
+        query_type=QueryType.MULTI_HOP,
+        failure_mode=FailureMode.RETRIEVAL_MISS,
+        is_failure=True,
+        diagnostic_explanation="Miss",
+        retrieval=ret_m,
+        generation=gen_m,
+        retrieved_chunk_ids=[],
+        target_chunk_ids=["c2"],
+        cited_chunk_ids=[],
+    )
+    diag3 = DiagnosticResult(
+        query_id="q3",
+        query_type=QueryType.UNANSWERABLE,
+        failure_mode=FailureMode.RETRIEVAL_MISS,
+        is_failure=True,
+        diagnostic_explanation="Miss again",
+        retrieval=ret_m,
+        generation=gen_m,
+        retrieved_chunk_ids=[],
+        target_chunk_ids=["c3"],
+        cited_chunk_ids=[],
+    )
+
+    agg = FailureAttributor.aggregate_diagnostics([diag1, diag2, diag3])
+    assert agg["total_queries"] == 3
+    assert agg["success_count"] == 1
+    assert agg["failure_count"] == 2
+    assert agg["grounded_success_rate"] == round(1 / 3, 4)
+    assert agg["top_failure_mode"] == FailureMode.RETRIEVAL_MISS.value
+    assert "dense embeddings" in agg["recommended_mitigation"]
+    assert QueryType.MULTI_HOP.value in agg["query_type_breakdown"]
+    assert agg["query_type_breakdown"][QueryType.MULTI_HOP.value]["failures"] == 1
+

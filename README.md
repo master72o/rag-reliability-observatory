@@ -3,6 +3,7 @@
 > **A Diagnostic Laboratory for Retrieval-Augmented Generation Systems — Decoupling Retrieval Failures, Ranking Degradation, Evidence Grounding & Failure Attribution.**
 
 [![CI](https://github.com/master72o/rag-reliability-observatory/actions/workflows/ci.yml/badge.svg)](https://github.com/master72o/rag-reliability-observatory/actions/workflows/ci.yml)
+[![PyTest: 100% Passing](https://img.shields.io/badge/PyTest-26%2F26%20Passing%20(100%25)-0A9EDC?logo=pytest&logoColor=white)](https://pytest.org)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Streamlit App](https://img.shields.io/badge/Streamlit-Live%20Dashboard-FF4B4B.svg)](app.py)
