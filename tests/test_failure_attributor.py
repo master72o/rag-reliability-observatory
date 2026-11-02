@@ -157,3 +157,64 @@ def test_aggregate_diagnostics_mixed_with_mitigation():
     assert QueryType.MULTI_HOP.value in agg["query_type_breakdown"]
     assert agg["query_type_breakdown"][QueryType.MULTI_HOP.value]["failures"] == 1
 
+
+def test_context_utilization_efficiency():
+    retrieved = [
+        RetrievedPassage(chunk_id="c1", score=0.95, rank=1, text="Primary evidence."),
+        RetrievedPassage(chunk_id="c2", score=0.80, rank=2, text="Secondary evidence."),
+        RetrievedPassage(chunk_id="c3", score=0.50, rank=3, text="Unused distractor."),
+        RetrievedPassage(chunk_id="c4", score=0.40, rank=4, text="Another distractor."),
+    ]
+    answer = GeneratedAnswer(
+        answer_text="Answer grounded in rank 1 and 2 [c1, c2].",
+        cited_chunk_ids=["c1", "c2"],
+    )
+    eff = FailureAttributor.compute_context_utilization_efficiency(retrieved, answer)
+    assert eff["retrieved_count"] == 4
+    assert eff["cited_retrieved_count"] == 2
+    assert eff["context_utilization_rate"] == 0.5
+    assert eff["context_waste_ratio"] == 0.5
+    assert eff["rank_weighted_utilization"] > 0.70
+
+
+def test_severity_weighted_reliability():
+    from rag_observatory.schema import DiagnosticResult
+
+    ret_m = RetrievalMetrics(precision_at_k=1.0, recall_at_k=1.0, mrr=1.0, ndcg=1.0, retrieved_count=1, target_count=1)
+    gen_m = GenerationMetrics(faithfulness=1.0, answer_correctness=1.0, citation_precision=1.0, citation_recall=1.0, abstention_accuracy=1.0)
+
+    d_ok = DiagnosticResult(
+        query_id="q1",
+        query_type=QueryType.DIRECT_FACTUAL,
+        failure_mode=FailureMode.SUCCESS_GROUNDED,
+        is_failure=False,
+        diagnostic_explanation="OK",
+        retrieval=ret_m,
+        generation=gen_m,
+        retrieved_chunk_ids=["c1"],
+        target_chunk_ids=["c1"],
+        cited_chunk_ids=["c1"],
+    )
+    d_halluc = DiagnosticResult(
+        query_id="q2",
+        query_type=QueryType.UNANSWERABLE,
+        failure_mode=FailureMode.UNGROUNDED_HALLUCINATION,
+        is_failure=True,
+        diagnostic_explanation="Hallucinated",
+        retrieval=ret_m,
+        generation=gen_m,
+        retrieved_chunk_ids=["c1"],
+        target_chunk_ids=[],
+        cited_chunk_ids=[],
+    )
+
+    res_pass = FailureAttributor.score_severity_weighted_reliability([d_ok, d_ok, d_ok])
+    assert res_pass["severity_weighted_index"] == 1.0
+    assert res_pass["release_gate_status"] == "PASS"
+
+    res_block = FailureAttributor.score_severity_weighted_reliability([d_ok, d_halluc])
+    assert res_block["severity_weighted_index"] == 0.5
+    assert res_block["critical_hallucination_rate"] == 0.5
+    assert res_block["release_gate_status"] == "BLOCK"
+
+

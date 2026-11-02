@@ -228,3 +228,98 @@ class FailureAttributor:
             "recommended_mitigation": recommendation,
         }
 
+    @staticmethod
+    def compute_context_utilization_efficiency(
+        retrieved: List[RetrievedPassage],
+        answer: GeneratedAnswer,
+    ) -> Dict[str, Any]:
+        """
+        Measures how efficiently retrieved context passages are cited in the generated answer,
+        computing citation density, rank-weighted utilization (1 / rank), and unused context waste ratio.
+        """
+        if not retrieved:
+            return {
+                "retrieved_count": 0,
+                "cited_retrieved_count": 0,
+                "context_utilization_rate": 0.0,
+                "context_waste_ratio": 0.0,
+                "rank_weighted_utilization": 0.0,
+            }
+
+        cited_set = set(answer.cited_chunk_ids)
+        cited_passages = [p for p in retrieved if p.chunk_id in cited_set]
+        total_ret = len(retrieved)
+        cited_count = len(cited_passages)
+
+        utilization_rate = cited_count / total_ret
+        waste_ratio = 1.0 - utilization_rate
+
+        max_harmonic = sum(1.0 / max(p.rank, 1) for p in retrieved)
+        cited_harmonic = sum(1.0 / max(p.rank, 1) for p in cited_passages)
+        rank_weighted = cited_harmonic / max_harmonic if max_harmonic > 0 else 0.0
+
+        return {
+            "retrieved_count": total_ret,
+            "cited_retrieved_count": cited_count,
+            "context_utilization_rate": round(utilization_rate, 4),
+            "context_waste_ratio": round(waste_ratio, 4),
+            "rank_weighted_utilization": round(rank_weighted, 4),
+        }
+
+    @staticmethod
+    def score_severity_weighted_reliability(
+        diagnostics: List[DiagnosticResult],
+    ) -> Dict[str, Any]:
+        """
+        Computes a severity-weighted reliability index across diagnostic results,
+        penalizing dangerous failure modes (ungrounded hallucinations, fabricated citations)
+        more heavily than conservative abstentions or low-ranked evidence.
+        """
+        if not diagnostics:
+            return {
+                "severity_weighted_index": 0.0,
+                "critical_hallucination_rate": 0.0,
+                "release_gate_status": "NO_DATA",
+            }
+
+        severity_weights = {
+            FailureMode.SUCCESS_GROUNDED.value: 0.0,
+            FailureMode.INCORRECT_ABSTENTION.value: 0.35,
+            FailureMode.EVIDENCE_RANKED_LOW.value: 0.45,
+            FailureMode.RETRIEVAL_MISS.value: 0.60,
+            FailureMode.CONTEXT_IGNORED.value: 0.75,
+            FailureMode.CITATION_MISMATCH.value: 0.90,
+            FailureMode.UNGROUNDED_HALLUCINATION.value: 1.00,
+        }
+
+        total_penalty = 0.0
+        critical_count = 0
+        for d in diagnostics:
+            mode_val = d.failure_mode.value if hasattr(d.failure_mode, "value") else str(d.failure_mode)
+            penalty = severity_weights.get(mode_val, 0.50 if d.is_failure else 0.0)
+            total_penalty += penalty
+            if mode_val in (
+                FailureMode.UNGROUNDED_HALLUCINATION.value,
+                FailureMode.CITATION_MISMATCH.value,
+            ):
+                critical_count += 1
+
+        n = len(diagnostics)
+        reliability_index = max(0.0, 1.0 - (total_penalty / n))
+        critical_rate = critical_count / n
+
+        status = (
+            "PASS"
+            if reliability_index >= 0.80 and critical_rate <= 0.05
+            else "WARN"
+            if reliability_index >= 0.65
+            else "BLOCK"
+        )
+
+        return {
+            "severity_weighted_index": round(reliability_index, 4),
+            "critical_hallucination_rate": round(critical_rate, 4),
+            "release_gate_status": status,
+        }
+
+
